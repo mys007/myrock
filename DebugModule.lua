@@ -45,23 +45,11 @@ function DebugModule:updateGradInput(input, gradOutput)
     return self.gradInput
 end
 
-local function sizeStr(x) 
-    if x:nDimension() == 0 then
-        return 'empty'
-    else
-        local str = ''
-        for i=1,x:nDimension() do
-            str = str .. x:size(i) .. (i ~= x:nDimension() and 'x' or '')
-        end
-        return str
-    end
-end
-
 function DebugModule:displayData(input, fwbw)
     assert(input ~= nil and fwbw ~= nil)
     
     if (torch.isTensor(input)) then
-        print('DebugModule ' .. self.name .. ': ' .. fwbw .. ' input size ' .. sizeStr(input))
+        print('DebugModule ' .. self.name .. ': ' .. fwbw .. ' input size ' .. formatSizeStr(input))
         if (self.print) then
             print(input)
         end         

@@ -56,6 +56,26 @@ function funcOnTensors(input, f)
     end
 end
 
+function formatSizeStr(input)
+    local function sizeStr(x) 
+        if x:nDimension() == 0 then
+            return 'empty'
+        else
+            local str = ''
+            for i=1,x:nDimension() do
+                str = str .. x:size(i) .. (i ~= x:nDimension() and 'x' or '')
+            end
+            return str
+        end
+    end
+    
+    local ret = funcOnTensors(input, sizeStr)
+    if (torch.type(input) == 'table') then
+        return table.concat(ret, ",") 
+    end
+    return ret
+end
+
 ----------------------------------------------------------------------
 --Efficiently converts a table of tensors to another type (esp. cuda<->ram): only one memory transfer call is made
 -- (nx uploading b bytes is much more expensive than 1x uploading nb bytes)
