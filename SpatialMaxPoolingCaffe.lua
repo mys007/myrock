@@ -14,28 +14,63 @@ local C = ffi.load(package.searchpath('libmyrock', package.cpath))
 local SpatialMaxPoolingCaffe, parent = torch.class('myrock.SpatialMaxPoolingCaffe', 'nn.SpatialMaxPooling')
 
 function SpatialMaxPoolingCaffe:__init(kW, kH, dW, dH)
-  parent.__init(self, kW, kH, dW, dH)
-  self.train = true
-  self:cuda()
+    parent.__init(self, kW, kH, dW, dH)
 end
 
 
 function SpatialMaxPoolingCaffe:updateOutput(input)
-  assert(torch.isTypeOf(input, 'torch.CudaTensor'))
-  C.SpatialMaxPoolingCaffe_updateOutput(cutorch.getState(), input:cdata(), self.output:cdata(),
-  	self.indices:cdata(), self.kW, self.kH, self.dW, self.dH, self.train)
-  return self.output
+    if torch.isTypeOf(self.output, 'torch.CudaTensor') then 
+        assert(torch.isTypeOf(input, 'torch.CudaTensor'))
+        C.SpatialMaxPoolingCaffe_updateOutput(cutorch.getState(), input:cdata(), self.output:cdata(),
+                                              self.indices:cdata(), self.kW, self.kH, self.dW, self.dH, true)    
+    else
+  	    local padW = math.max(0, input:size(input:dim()) - self.kW) % self.dW
+        local padH = math.max(0, input:size(input:dim()-1) - self.kH) % self.dH
+        if (padW>0 or padH>0) then
+            if not self.padder then self.padder = nn.SpatialZeroPadding(0) end
+            self.padder.pad_r = padW>0 and (self.dW - padW) or 0
+            self.padder.pad_b = padH>0 and (self.dH - padH) or 0
+            input.nn.SpatialMaxPooling_updateOutput(self, self.padder:updateOutput(input))
+        else
+            input.nn.SpatialMaxPooling_updateOutput(self, input)
+        end
+    end
+    return self.output
 end
 
 function SpatialMaxPoolingCaffe:updateGradInput(input, gradOutput)
-  assert(torch.isTypeOf(input, 'torch.CudaTensor'))
-  assert(torch.isTypeOf(gradOutput, 'torch.CudaTensor'))
-  assert(gradOutput:nElement()==self.indices:nElement(), 'Wrong gradOutput size')
-  C.SpatialMaxPoolingCaffe_updateGradInput(cutorch.getState(), input:cdata(), self.gradInput:cdata(),
-  	gradOutput:cdata(), self.indices:cdata(), self.kW, self.kH, self.dW, self.dH)
-  return self.gradInput
+    if torch.isTypeOf(self.output, 'torch.CudaTensor') then 
+      assert(torch.isTypeOf(input, 'torch.CudaTensor'))
+      assert(torch.isTypeOf(gradOutput, 'torch.CudaTensor'))
+      assert(gradOutput:nElement()==self.indices:nElement(), 'Wrong gradOutput size')
+      C.SpatialMaxPoolingCaffe_updateGradInput(cutorch.getState(), input:cdata(), self.gradInput:cdata(),
+      	gradOutput:cdata(), self.indices:cdata(), self.kW, self.kH, self.dW, self.dH)
+    else
+        local padW = math.max(0, input:size(input:dim()) - self.kW) % self.dW
+        local padH = math.max(0, input:size(input:dim()-1) - self.kH) % self.dH
+        if (padW>0 or padH>0) then
+            if self.gradInputMy then self.gradInput = self.gradInputMy end
+            input.nn.SpatialMaxPooling_updateGradInput(self, self.padder.output, gradOutput)
+            self.gradInputMy = self.gradInput
+            self.gradInput = self.padder:updateGradInput(input, self.gradInput)
+        else
+            input.nn.SpatialMaxPooling_updateGradInput(self, input, gradOutput)
+        end
+    end      	
+    return self.gradInput
 end
 
+function SpatialMaxPoolingCaffe:type(type)
+   self.indices = torch.Tensor()
+   self.gradInput = torch.Tensor()
+   self.output = torch.Tensor()
+   self.padder = nil
+   return parent.type(self,type)
+end
+
+function SpatialMaxPoolingCaffe:ceil(doCeil)
+   assert(doCeil, 'floor not implemented yet')
+end
 
 --------------------------------------- TEST ---------------------------------------
 --[[
@@ -65,7 +100,7 @@ function OFFmytest.testDeterminismccn2()
     end
 end
 
-function mytest.testDeterminism()
+function OFFmytest.testDeterminism()
     torch.setdefaulttensortype('torch.FloatTensor')
     torch.manualSeed(1)
     
@@ -123,7 +158,7 @@ function OFFmytest.SpatialStochasticPooling()
    tester:assertlt(berr, 1e-6, torch.typename(module) .. ' - i/o backward err (Batch) ')
 end
 
-function OFFmytest.testEquiv()
+function mytest.testEquiv()
     torch.setdefaulttensortype('torch.FloatTensor')
     torch.manualSeed(1)
     cutorch.setDevice(2)
@@ -142,12 +177,39 @@ function OFFmytest.testEquiv()
           
             require 'cunn'
             require 'cudnn'
-            local input = torch.rand(nbatch,from,ini,inj):cuda()
-            local module1 = myrock.SpatialMaxPoolingCaffe(ki,kj,si,sj)
+            local input = torch.rand(nbatch,from,inj,ini):cuda()
+            local module1 = myrock.SpatialMaxPoolingCaffe(ki,kj,si,sj):cuda()
             local module2 = cudnn.SpatialMaxPooling(ki,kj,si,sj):ceil():cuda()
             local out = module1(input):clone()
             tester:assertTensorEq(out, module2(input), 1e-6)
             tester:assertTensorEq(module1(input,out+1), module2(input,out+1), 1e-6)
+            collectgarbage()
+     end       
+end
+
+function OFFmytest.testEquivCPU()
+    torch.setdefaulttensortype('torch.FloatTensor')
+    torch.manualSeed(1)
+    
+    for it=1,50 do
+           local from = math.random(1,5)
+           local nbatch = math.random(1,5)
+           local ki = math.random(1,4)
+           local kj = math.random(1,4)
+           local si = math.random(1,3)
+           local sj = math.random(1,3)
+           local outi = math.random(4,5)
+           local outj = math.random(4,5)
+           local ini = (outi-1)*si+ki
+           local inj = (outj-1)*sj+kj
+          
+            require 'cunn'
+            local input = torch.rand(nbatch,from,inj,ini)
+            local module1 = myrock.SpatialMaxPoolingCaffe(ki,kj,si,sj)
+            local module2 = myrock.SpatialMaxPoolingCaffe(ki,kj,si,sj):cuda()
+            local out = module1(input):clone()
+            tester:assertTensorEq(out, module2(input:cuda()):float(), 1e-6)
+            tester:assertTensorEq(module1(input,out), module2(input:cuda(),out:cuda()):float(), 1e-6)
             collectgarbage()
      end       
 end
