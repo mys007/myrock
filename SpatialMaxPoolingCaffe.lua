@@ -70,6 +70,7 @@ end
 
 function SpatialMaxPoolingCaffe:ceil(doCeil)
    assert(doCeil, 'floor not implemented yet')
+   return self
 end
 
 --------------------------------------- TEST ---------------------------------------
