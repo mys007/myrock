@@ -38,8 +38,8 @@ function prepareGradPerModule(model, opt)
         if module.weight then
             -- personalized learning rate (faster solution: edit scale in Module:backward ... but we lose weight/bias distinction) and weight decay
             if (not opt.parSharing or module.pendingSharing == nil) then
-                if (module.lrFactorW ~= nil) then module.gradWeight:mul(module.lrFactorW) end
-                if (module.lrFactorB ~= nil) then module.gradBias:mul(module.lrFactorB) end
+                if (module.lrFactorW ~= nil and module.lrFactorW ~= 1) then module.gradWeight:mul(module.lrFactorW) end
+                if (module.lrFactorB ~= nil and module.lrFactorB ~= 1) then module.gradBias:mul(module.lrFactorB) end
             end          
 
             --NOTE: this is different than in optim.sgd, they ignore shared weights
