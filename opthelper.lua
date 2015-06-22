@@ -7,8 +7,9 @@ require 'strict'
 -- 1) applies caffeBiases, 2) initializes custom weights
 function prepareModel(model, opt)
     -- Weight initialization
-    if opt.winit == 'He' then resetHe2015(model, opt) end
-    if opt.winit == 'Nin' then resetNin(model) end  --TODO: should probably write a nice parsing-based init
+    if opt.winit == 'He' then resetHe2015(model, opt)
+    elseif opt.winit == 'Nin' then resetNin(model)  --TODO: should probably write a nice parsing-based init
+    elseif opt.winit ~= 'default' then error('unknown winit') end
 
     -- Set individual factors
     for i,module in ipairs(model:listModules()) do
@@ -109,6 +110,9 @@ end
 
 do
     local cleanModel, cleanParameters = nil, nil
+    
+    -- TODO/BUG: this is practically useless if modelCreate calls sth like model:forward(expectedInput) ... then all has been filled.
+        -- .. should probably use sth like sanitize(net) from FB
     
     ----------------------------------------------------------------------
     --clones a model in order to always save a clean copy

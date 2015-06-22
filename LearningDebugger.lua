@@ -108,34 +108,35 @@ end
 local LearningLogger = torch.class('LearningLogger')
 
 
-function LearningLogger:__init(basepath, showPlots)
+function LearningLogger:__init(basepath, showPlots, accuracyLegend)
     assert(basepath~=nil and showPlots~=nil)    
+    accuracyLegend = accuracyLegend or {'% mean class accuracy (train)', '% mean class accuracy (valid)', '% mean class accuracy (test)'}
     
     --TODO: if files exist, load self and resume
     
     self.accuracyL = optim.Logger(paths.concat(basepath, 'accuracy.log'))
-    self.accuracyL:setNames{'% mean class accuracy (train)', '% mean class accuracy (valid)', '% mean class accuracy (test)'}
-    self.accuracyL:style{'-','-','-'}
+    self.accuracyL.defaultStyle = '-'
+    self.accuracyL:setNames(accuracyLegend)
     self.accuracyL.showPlot = showPlots
     
     self.lossL = optim.Logger(paths.concat(basepath, 'loss.log'))
+    self.lossL.defaultStyle = '-'
     self.lossL:setNames{'batch loss (train)'}
-    self.lossL:style{'-'}
     self.lossL.showPlot = showPlots
     
     self.weightsL = optim.Logger(paths.concat(basepath, 'weights.log'))
+    self.weightsL.defaultStyle = '-'
     self.weightsL:setNames{'L2 norm', 'mean', 'max', 'min'}
-    self.weightsL:style{'-','-','-','-'}
     self.weightsL.showPlot = showPlots
     
     self.gradUpdL = optim.Logger(paths.concat(basepath, 'gradUpd.log'))
+    self.gradUpdL.defaultStyle = '-'
     self.gradUpdL:setNames{'L2 norm', 'mean', 'max', 'min', 'learningRate'}
-    self.gradUpdL:style{'-','-','-','-','-'}
     self.gradUpdL.showPlot = showPlots
        
     self.gradWeightRatioL = optim.Logger(paths.concat(basepath, 'gradWeightRatio.log'))
+    self.gradWeightRatioL.defaultStyle = '-'
     self.gradWeightRatioL:setNames{'L2 norm ratio', 'mean ratio', 'max ratio', 'min ratio'}
-    self.gradWeightRatioL:style{'-','-','-','-'}
     self.gradWeightRatioL.showPlot = showPlots
     
     self.iterCtr = 0
@@ -144,9 +145,8 @@ function LearningLogger:__init(basepath, showPlots)
 end
 
 
-function LearningLogger:logAccuracy(trainA, validA, testA)
-    assert(trainA ~= nil and validA ~= nil and testA ~= nil)
-    self.accuracyL:add({trainA, validA, testA})
+function LearningLogger:logAccuracy(...)
+    self.accuracyL:add({...})
 end
 
 function LearningLogger:logLoss(trainL)
