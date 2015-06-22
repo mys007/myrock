@@ -7,10 +7,18 @@ require 'strict'
 -- 1) applies caffeBiases, 2) initializes custom weights
 function prepareModel(model, opt)
     -- Weight initialization
-    if opt.winit == 'He' then resetHe2015(model, opt)
-    elseif opt.winit == 'Nin' then resetNin(model)  --TODO: should probably write a nice parsing-based init
-    elseif opt.winit ~= 'default' then error('unknown winit') end
-
+    if (opt.winit ~= 'default') then
+        local rngState = torch.getRNGState()    --don't mess up repeatability
+        torch.manualSeed(opt.seed)
+        
+        if opt.winit == 'He' then resetHe2015(model, opt)
+        elseif opt.winit == 'Gauss' then resetGaussConst(model)
+        elseif opt.winit == 'Nin' then resetNin(model) --TODO: legacy
+        else error('unknown winit') end
+        
+        torch.setRNGState(rngState)
+    end
+    
     -- Set individual factors
     for i,module in ipairs(model:listModules()) do
         if (opt.caffeBiases and module.weight ~= nil) then

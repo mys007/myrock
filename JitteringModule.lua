@@ -17,7 +17,7 @@ end
 
 function JitteringModuleGNoise:updateOutput(input)
     if (not self.output or not self.output:isSameSizeAs(input)) then
-        self.output = torch.Tensor(input:size()) 
+        self.output = input:clone()
     end
 
     if self.train then
@@ -25,7 +25,7 @@ function JitteringModuleGNoise:updateOutput(input)
         --torch.manualSeed(1)
         --self.output:normal(0, 10)
         
-        self.output:normal(0, math.max(torch.std(input) / self.factor, 1e-5))
+        self.output:normal(0, math.max(torch.std(input) * self.factor, 1e-7))   --TODO: maybe per-element value instead of std?
         self.output:add(input)
     else
         self.output:copy(input) --TODO: should boost sth like dropout does?

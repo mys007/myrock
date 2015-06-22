@@ -189,10 +189,37 @@ end
 function resetNin(model)
     for _,module in ipairs(model:listModules()) do
         if module:parameters() ~= nil and (module.weight ~= nil or module.bias~=nil) then
+            assert(torch.typename(module) ~= 'ccn2.SpatialConvolution', 'not impl yet')
             module.weight:normal(0, 0.05)  
             module.bias:zero()
         end
     end
+end
+
+----------------------------------------------------------------------
+-- Plain old Gaussian noise with stddev and bias (per module)
+function resetGaussConst(model)
+    for _,module in ipairs(model:listModules()) do
+        if module:parameters() ~= nil and (module.weight ~= nil or module.bias~=nil) then
+            if torch.typename(module) == 'ccn2.SpatialConvolution' then
+                local Wt = module.weight:view(-1, module.kH ,module.kH, module.nOutputPlane)
+                Wt = Wt:transpose(1, 4):transpose(2, 4):transpose(3, 4)
+                Wt:normal(0, module.resetGstddev)
+            else   
+                module.weight:normal(0, module.resetGstddev)
+            end      
+            module.bias:fill(module.resetGbias or 0)
+        end
+    end
+end
+
+----------------------------------------------------------------------
+-- Prepares parameters for resetGaussConst()
+function gaussConstInit(module, wstddev, bval)
+    assert(module and wstddev)
+    module.resetGstddev = wstddev
+    if bval then module.resetGbias = bval end
+    return module        
 end
 
 ----------------------------------------------------------------------
