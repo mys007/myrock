@@ -64,7 +64,7 @@ function DebugModule:displayData(input, fwbw)
         end
     elseif (torch.type(input) == 'table') then
         print('DebugModule ' .. self.name .. ': ' .. fwbw)
-        print(input)
+        print(formatSizeStr(input))
         if (self.plot) then
             for i=1,#input do
                 if (input[i]:dim()>0) then

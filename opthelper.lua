@@ -104,6 +104,7 @@ function doOptStep(model, parameters, feval, opt, config)
 
     elseif opt.optimization == 'ASGD' then
         config.eta0 = opt.learningRate --(not exactly the same formula as in sgd)
+        config.learningRate = opt.learningRate
         if model.epoch < opt.asgdE0 then config.t0 = 1e20 elseif config.t0 == 1e20 then config.t0 = config.t end 
         config.lambda = 0 --weightDecay handled in prepareGradPerModule
         local _,loss,avgx = optim.asgd(feval, parameters, config)
