@@ -129,6 +129,7 @@ function tensortableType(input, type)
     end
     return output
 end
+
 ----------------------------------------------------------------------
 -- Adds a 0-padding layer to model if the input isn't exactly divisible by max-poling and max-pool would floor-down the size.
 --TODO: maybe should use Sergey's image-nn version... (avoids padding)
@@ -141,6 +142,21 @@ function zeroPadMPCeil(model, w, h, kW, kH, dW, dH)
         model:add(nn.SpatialZeroPadding(0, padW>0 and (dW - padW) or 0, 0, padH>0 and (dH - padH) or 0))
     end
 end
+
+----------------------------------------------------------------------
+-- Intersection and Union of axis-aligned boxes. Input format of indexes as for Tensor.operator[]
+function boxIntersectionUnion(idx1, idx2)
+    assert(#idx1==#idx2)
+    local inter, area1, area2 = 1, 1, 1
+    for i=1,#idx1 do
+        inter = inter * math.max(0, math.min(idx1[i][2],idx2[i][2])+1 - math.max(idx1[i][1],idx2[i][1]))
+        area1 = area1 * (idx1[i][2]+1 - idx1[i][1])
+        area2 = area2 * (idx2[i][2]+1 - idx2[i][1])
+    end
+    local union = area1 + area2 - inter
+    return inter, union
+end 
+
 ----------------------------------------------------------------------
 -- Plots weights in nn.SpatialConvolutionMM
 function plotSpatialConvolutionMM(convmm, win, legend)
