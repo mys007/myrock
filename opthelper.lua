@@ -121,7 +121,8 @@ do
     local cleanModel, cleanParameters = nil, nil
     
     -- TODO/BUG: this is practically useless if modelCreate calls sth like model:forward(expectedInput) ... then all has been filled.
-        -- .. should probably use sth like sanitize(net) from FB
+        -- .. should probably use sth like sanitize(net) from FB on cleanModel in cleanModelInit
+    -- TODO: another issue is that convolutions allocate gradX in constructor only, so we have to save it
     
     ----------------------------------------------------------------------
     --clones a model in order to always save a clean copy

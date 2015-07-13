@@ -82,6 +82,23 @@ function funcOnTensors(input, f)
 end
 
 ----------------------------------------------------------------------
+-- Prints the memory consumed by a model by recursively crawling its tensors. Prints pointer to storages for reasoning about sharing.
+function printModelMemUse(model)
+    local function recursivePrintMem(str,param)
+        if (torch.isTensor(param)) then
+            local ptr = param:storage() and string.format('0x%X',torch.pointer(param:storage())) or ''
+            print(str..'['..ptr..']:\t'..(param:nElement()*4/1024/1024)..'MB')
+        elseif (torch.type(param) == 'table') then
+            for k,v in pairs(param) do recursivePrintMem(str..'/'..k,v) end
+        elseif torch.isTypeOf(param, 'nn.Module') then
+            str = str..'('..torch.typename(param)..')'
+            for k,v in pairs(param) do recursivePrintMem(str..'/'..k,v) end            
+        end
+    end
+    recursivePrintMem('/', model)
+end
+
+----------------------------------------------------------------------
 -- Returns a string of tensor dimension AxBxCx..
 function formatSizeStr(input)
     local function sizeStr(x) 

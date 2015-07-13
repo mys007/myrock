@@ -26,7 +26,7 @@ function JitteringModuleGNoise:updateOutput(input)
         --self.output:normal(0, 10)
         
         self.output:normal(0, math.max(torch.std(input) * self.factor, 1e-7))   --TODO: maybe per-element value instead of std?
-        self.output:add(input)
+        self.output:add(input) --TODO: could be done inplace (but probably in C)
     else
         self.output:copy(input) --TODO: should boost sth like dropout does?
     end    
