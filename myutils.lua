@@ -175,6 +175,17 @@ function boxIntersectionUnion(idx1, idx2)
 end 
 
 ----------------------------------------------------------------------
+-- L2-Distance between box centers. Input format of indexes as for Tensor.operator[]
+function boxCenterDistance(idx1, idx2)
+    assert(#idx1==#idx2)
+    local dist = 0
+    for i=1,#idx1 do
+        dist = dist + ((idx1[i][2] - idx1[i][1] + 1) - (idx2[i][2] - idx2[i][1] + 1))^2
+    end
+    return math.sqrt(dist)
+end 
+
+----------------------------------------------------------------------
 -- Plots weights in nn.SpatialConvolutionMM
 function plotSpatialConvolutionMM(convmm, win, legend)
     --local delta = torch.Tensor(3,20,20):zero()
