@@ -24,7 +24,7 @@ function Sun397:__init(config)
     -- try to load self from cache
     local b = function (p) return p and '1' or '0' end
     local paramstr = self.nValidations..'_'..self.nSampleRatio..'_'..self.partition..'_'..self.minSize..'_'..self.normalizationMode..'_'..b(self.squareCrop)..'_'..b(self.fullTrainSet)..'_'..b(self.sampleAllSets)
-    local success, cachedSelf = pcall(torch.load, '/home/simonovm/datasets/cache/sun_'..paramstr..'.bin')
+    local success, cachedSelf = pcall(torch.load, os.getenv('HOME')..'/datasets/cache/sun_'..paramstr..'.bin')
     if (success) then 
         print('Reusing cache')
         self.trainData = cachedSelf.trainData; self.validData = cachedSelf.validData; self.testData = cachedSelf.testData; self.classNames = cachedSelf.classNames
@@ -57,7 +57,7 @@ function Sun397:__init(config)
     
     end
     
-    torch.save('/home/simonovm/datasets/cache/sun_'..paramstr..'.bin', self)
+    torch.save(os.getenv('HOME')..'/datasets/cache/sun_'..paramstr..'.bin', self)
 end
 
 

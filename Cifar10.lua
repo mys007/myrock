@@ -173,7 +173,7 @@ function Cifar10:__init(config)
     
     _, self.dir, self.nValidations, self.nSampleRatio, self.augmentCropScaleFlip, self.normalizationMode, self.sampleAllSets = 
         xlua.unpack({config}, 'torch.Cifar10', nil,
-        {arg='dir', type='string', help='', req=false, default='/home/simonovm/datasets/cifar-10-batches-t7'},
+        {arg='dir', type='string', help='', req=false, default=os.getenv('HOME')..'/datasets/cifar-10-batches-t7'},
         {arg='nValidations', type='number', help='', req=false, default=5000},
         {arg='nSampleRatio', type='number', help='', req=false, default=1},
         {arg='augmentCropScaleFlip', type='number', help='', req=false, default=0}, -- 0=no, 1=train, 2=all
@@ -184,7 +184,7 @@ function Cifar10:__init(config)
     
     -- try to load self from cache
     local paramstr = self.nValidations..'_'..self.nSampleRatio..'_'..self.augmentCropScaleFlip..'_'..self.normalizationMode..'_'..self.sampleAllSets
-    local success, cachedSelf = pcall(torch.load, '/home/simonovm/datasets/cache/'..torch.type(self)..'_'..paramstr..'.bin')
+    local success, cachedSelf = pcall(torch.load, os.getenv('HOME')..'/datasets/cache/'..torch.type(self)..'_'..paramstr..'.bin')
     if (success) then 
         print('Reusing cache')
         self.trainData = cachedSelf.trainData; self.validData = cachedSelf.validData; self.testData = cachedSelf.testData
@@ -229,7 +229,7 @@ function Cifar10:__init(config)
         assert(false, 'unknown normalizationMode')
     end    
     
-    torch.save('/home/simonovm/datasets/cache/'..torch.type(self)..'_'..paramstr..'.bin', self)
+    torch.save(os.getenv('HOME')..'/datasets/cache/'..torch.type(self)..'_'..paramstr..'.bin', self)
     
     --> self.trainData ; self.validData ; self.testData
 end
