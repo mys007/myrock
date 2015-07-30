@@ -62,6 +62,103 @@ function prepareGradPerModule(model, opt)
 end        
 
 
+--[[ based on optim.sqd
+
+ARGS:
+
+- `opfunc` : a function that takes a single input (X), the point
+             of a evaluation, and returns f(X) and df/dX
+- `x`      : the initial point
+- `config` : a table with configuration parameters for the optimizer
+- `config.learningRate`      : learning rate
+- `config.learningRateDecay` : learning rate decay
+- `config.weightDecay`       : weight decay
+- `config.weightDecays`      : vector of individual weight decays
+- `config.momentum`          : momentum
+- `config.dampening`         : dampening for momentum
+- `config.nesterov`          : enables Nesterov momentum
+- `state`  : a table describing the state of the optimizer; after each
+             call the state is modified
+- `state.learningRates`      : vector of individual learning rates
+
+RETURN:
+- `x`     : the new x vector
+- `f(x)`  : the function, evaluated before the update
+
+(Clement Farabet, 2012)
+]]
+local function optimSgd(opfunc, x, config, state)
+   -- (0) get/update state
+   local config = config or {}
+   local state = state or config
+   local lr = config.learningRate or 1e-3
+   local lrd = config.learningRateDecay or 0
+   local wd = config.weightDecay or 0
+   local mom = config.momentum or 0
+   local damp = config.dampening or mom
+   local nesterov = config.nesterov or false
+   local lrs = config.learningRates
+   local wds = config.weightDecays
+   state.evalCounter = state.evalCounter or 0
+   local nevals = state.evalCounter
+   assert(not nesterov or (mom > 0 and damp == 0), "Nesterov momentum requires a momentum and zero dampening")
+
+   assert(wd==0 and not wds and not lrs) --implemeted in doOptStep
+
+   -- evaluate f(x) and df/dx
+   local fx,dfdx = opfunc(x)
+   
+   -- learning rate decay (annealing)
+   local clr = lr / (1 + nevals*lrd)
+   
+   if config.caffeFormula then
+       -- ** Krizhevsky/Caffe style
+       -- ? Btw, the effective learning rate is then ~ clr * 1/(1-momentum)  [assuming constant dfdx, rewrite the update recursion to clr*dfdx*sum_i{0,inf}(momentum^i)]
+       if mom ~= 0 then
+          --if not state.dfdx then          --- OLD BUT HORRIBLY WRONG BEHAVIOR
+          --   state.dfdx = torch.Tensor():typeAs(dfdx):resizeAs(dfdx):copy(dfdx)
+          --else
+          --   state.dfdx:mul(mom):add(-clr, dfdx)
+          --end       
+          state.dfdx = state.dfdx or torch.Tensor():typeAs(dfdx):resizeAs(dfdx):fill(0)
+          state.dfdx:mul(mom):add(-clr, dfdx)
+          if nesterov then
+             assert(false,'not verified how to do it yet')
+             dfdx:add(mom, state.dfdx)
+          else
+             dfdx = state.dfdx
+          end
+          x:add(dfdx)
+          clr = -1
+       else
+          x:add(-clr, dfdx)
+       end   
+    
+    else
+       -- ** Torch original
+       if mom ~= 0 then
+          if not state.dfdx then
+             state.dfdx = torch.Tensor():typeAs(dfdx):resizeAs(dfdx):copy(dfdx)
+          else
+             state.dfdx:mul(mom):add(1-damp, dfdx)
+          end
+          if nesterov then
+             dfdx:add(mom, state.dfdx)
+          else
+             dfdx = state.dfdx
+          end
+       end
+
+       x:add(-clr, dfdx)
+    end   
+     
+   -- update evaluation counter
+   state.evalCounter = state.evalCounter + 1
+
+   -- return x*, f(x) before optimization, delta
+   return x,{fx},{-clr, dfdx}
+end
+
 ----------------------------------------------------------------------
 -- optimize on current mini-batch
 function doOptStep(model, parameters, feval, opt, config)
@@ -81,6 +178,7 @@ function doOptStep(model, parameters, feval, opt, config)
         config.momentum = opt.momentum
         config.dampening = opt.momdampening>=0 and opt.momdampening or opt.momentum
         config.evalCounter = config.evalCounter or 0
+        config.caffeFormula = (opt.optimization == 'SGDCaffe')
 
         if (opt.lrdPolicy == 'fixed') then
             config.learningRate = opt.learningRate
@@ -96,9 +194,7 @@ function doOptStep(model, parameters, feval, opt, config)
             assert(false, 'unknown lrdPolicy')    
         end
 
-        local loss,step
-        if opt.optimization == 'SGD' then _,loss,step = optim.sgd(feval, parameters, config) end
-        if opt.optimization == 'SGDCaffe' then _,loss,step = optim.sgdcaffe(feval, parameters, config) end
+        local _,loss,step = optimSgd(feval, parameters, config) 
             
         return loss[1], step      
 

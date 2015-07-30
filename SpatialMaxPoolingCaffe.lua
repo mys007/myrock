@@ -1,6 +1,9 @@
+
+--- LEGACY. From end of June15 implemented in standard nn.SpatialMaxPooling
+
 local ffi = require 'ffi'
 require 'cunn'
-myrock = {}
+
 ffi.cdef[[
 void SpatialMaxPoolingCaffe_updateOutput(THCState* state, THCudaTensor* input, 
     THCudaTensor* output, THCudaTensor* indices, int kW, int kH, int dW, int dH, bool train);
