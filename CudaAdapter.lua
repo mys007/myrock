@@ -8,7 +8,7 @@ require 'strict'
 -- If the type of the adaptee's tensors differ, a conversion is performed. Note that the conversion
 -- is of course expensive and causes a major delay (although implemented efficiently).
 
-local CudaAdapter, parent = torch.class('nn.CudaAdapter', 'nn.Container')
+local CudaAdapter, parent = torch.class('myrock.CudaAdapter', 'nn.Container')
 
 function CudaAdapter:__init(module)
     assert(module ~= nil)
@@ -61,5 +61,5 @@ function CudaAdapter:type(type)
 end
 
 function CudaAdapter:__tostring__()
-   return 'nn.CudaAdapter' .. ' {' .. tostring(self.modules[1]) .. '}'
+   return 'myrock.CudaAdapter' .. ' {' .. tostring(self.modules[1]) .. '}'
 end

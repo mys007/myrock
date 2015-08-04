@@ -9,7 +9,7 @@ local _
  
 --TODO: would be nice to add logging to a Logger (a special DebugLogging instance shared among all DebugModules). User can specify aggregation function of input/gradOutput->single number
 
-local DebugModule, parent = torch.class('nn.DebugModule', 'nn.Module')
+local DebugModule, parent = torch.class('myrock.DebugModule', 'nn.Module')
 
 local help_desc = [[todo]]
 
@@ -18,7 +18,7 @@ function DebugModule:__init(config)
     parent.__init(self)
 
     _, self.name, self.plot, self.print = 
-        xlua.unpack({config}, 'nn.DebugModule',  help_desc,
+        xlua.unpack({config}, 'myrock.DebugModule',  help_desc,
         {arg='name', type='string', help='User identifier of the module', req=true},
         {arg='plot', type='boolean', help='Plot yes/no', req=false, default=false},
         {arg='print', type='boolean', help='Full print yes/no', req=false, default=false}
