@@ -99,6 +99,23 @@ function printModelMemUse(model)
 end
 
 ----------------------------------------------------------------------
+-- Prints a Lua table
+function printTable(input)
+    local function recursivePrint(input)
+        if torch.type(input) == 'table' then
+            local str = '{'
+            for k,v in pairs(input) do 
+                str = str..k..'='..recursivePrint(v)..', '
+            end
+            return string.sub(str, 1, #str-2)..'}'
+        else
+            return input
+        end
+    end
+    print(recursivePrint(input))
+end
+
+----------------------------------------------------------------------
 -- Returns a string of tensor dimension AxBxCx..
 function formatSizeStr(input)
     local function sizeStr(x) 
@@ -184,6 +201,20 @@ function boxCenterDistance(idx1, idx2)
     end
     return math.sqrt(dist)
 end 
+
+------------------------------
+-- pads a patch with pad at each side (or with degenPad for the degenerate dim)
+function boxPad(indices, pad, degenPad)
+    local out = {}
+    for i=1,#indices do
+        if indices[i][1]==indices[i][2] then 
+            out[i] = {indices[i][1] - degenPad, indices[i][2] + degenPad}
+        else
+            out[i] = {indices[i][1] - pad, indices[i][2] + pad}
+        end
+    end
+    return out
+end
 
 ----------------------------------------------------------------------
 -- Plots weights in nn.SpatialConvolutionMM
