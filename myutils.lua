@@ -108,7 +108,9 @@ function printTable(input)
                 str = str..k..'='..recursivePrint(v)..', '
             end
             return string.sub(str, 1, #str-2)..'}'
-        else
+        elseif torch.type(input) == 'boolean' then
+            return input and 'true' or 'false'
+        else    
             return input
         end
     end
@@ -197,7 +199,7 @@ function boxCenterDistance(idx1, idx2)
     assert(#idx1==#idx2)
     local dist = 0
     for i=1,#idx1 do
-        dist = dist + ((idx1[i][2] - idx1[i][1] + 1) - (idx2[i][2] - idx2[i][1] + 1))^2
+        dist = dist + ((idx1[i][2] + idx1[i][1])/2 - (idx2[i][2] + idx2[i][1])/2)^2
     end
     return math.sqrt(dist)
 end 

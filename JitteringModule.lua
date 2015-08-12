@@ -6,13 +6,14 @@ require 'myutils'
 require 'strict'
 
 --------------------------------------- JitteringModuleGNoise ---------------------------------------
-
+-- factor = stddev (multiplicative) or factor on measured_stddev (not multiplicative)
 local JitteringModuleGNoise, JitteringModuleGNoise_parent = torch.class('nn.JitteringModuleGNoise', 'nn.Module')
 
-function JitteringModuleGNoise:__init(factor)
+function JitteringModuleGNoise:__init(factor, multiplicative)
     assert(factor~=nil)
     JitteringModuleGNoise_parent.__init(self)
     self.factor = factor
+    self.multip = multiplicative or true
 end
 
 function JitteringModuleGNoise:updateOutput(input)
@@ -21,25 +22,39 @@ function JitteringModuleGNoise:updateOutput(input)
     end
 
     if self.train then
-        --for unit test
-        --torch.manualSeed(1)
-        --self.output:normal(0, 10)
+        if self.multip then
+            self.coefs = self.coefs or input:clone()
+            self.coefs:normal(1, self.factor)
+            self.coefs:cmin(1+3*self.factor)    --better truncate, far outliers could explode learning?
+            self.coefs:cmax(1-3*self.factor)            
+            self.output:cmul(input, self.coefs)     
+        else
+            --for unit test
+            --torch.manualSeed(1)
+            --self.output:normal(0, 10)        
         
-        self.output:normal(0, math.max(torch.std(input) * self.factor, 1e-7))   --TODO: maybe per-element value instead of std?
-        self.output:add(input) --TODO: could be done inplace (but probably in C)
+            local stdd = math.max(torch.std(input) * self.factor, 1e-7)
+            self.output:normal(0, stdd)
+            self.coefs:cmin(0+3*stdd)   --better truncate, far outliers could explode learning?
+            self.coefs:cmax(0-3*stdd)                   
+            self.output:add(input)
+        end
     else
-        self.output:copy(input) --TODO: should boost sth like dropout does?
+        self.output:copy(input)
     end    
     return self.output
 end
 
 function JitteringModuleGNoise:updateGradInput(input, gradOutput)
     assert(input ~= nil and gradOutput ~= nil and self.train)
-    self.gradInput = gradOutput -- derivative of additive noise = 0
+    if self.multip then
+        self.gradInput:resizeAs(input)
+        self.gradInput:cmul(gradOutput, self.coefs)
+    else
+        self.gradInput = gradOutput -- derivative of additive noise = 0
+    end
     return self.gradInput
 end
-
-
 
 --------------------------------------- JitteringModuleScale ---------------------------------------
 

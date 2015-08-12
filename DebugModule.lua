@@ -1,6 +1,5 @@
 require 'nn'
 require 'image'
-require 'trepl'
 require 'strict'
 local _
 
