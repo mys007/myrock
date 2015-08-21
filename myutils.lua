@@ -278,14 +278,20 @@ end
 function resetGaussConst(model)
     for _,module in ipairs(model:listModules()) do
         if module:parameters() ~= nil and (module.weight ~= nil or module.bias~=nil) then
-            if torch.typename(module) == 'ccn2.SpatialConvolution' then
-                local Wt = module.weight:view(-1, module.kH ,module.kH, module.nOutputPlane)
-                Wt = Wt:transpose(1, 4):transpose(2, 4):transpose(3, 4)
-                Wt:normal(0, module.resetGstddev)
-            else   
-                module.weight:normal(0, module.resetGstddev)
-            end      
-            module.bias:fill(module.resetGbias or 0)
+            --typically convolutions
+            if module.resetGstddev ~= nil then
+                if torch.typename(module) == 'ccn2.SpatialConvolution' then
+                    local Wt = module.weight:view(-1, module.kH ,module.kH, module.nOutputPlane)
+                    Wt = Wt:transpose(1, 4):transpose(2, 4):transpose(3, 4)
+                    Wt:normal(0, module.resetGstddev)
+                else   
+                    module.weight:normal(0, module.resetGstddev)
+                end      
+                module.bias:fill(module.resetGbias or 0)
+            --typically batchnorm, prelu, ..
+            else
+                module:reset()
+            end
         end
     end
 end

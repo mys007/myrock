@@ -216,16 +216,34 @@ end
 do
     local cleanModel, cleanParameters = nil, nil
     
-    -- TODO/BUG: this is practically useless if modelCreate calls sth like model:forward(expectedInput) ... then all has been filled.
-        -- .. should probably use sth like sanitize(net) from FB on cleanModel in cleanModelInit
-    -- TODO: another issue is that convolutions allocate gradX in constructor only, so we have to save it
-    
     ----------------------------------------------------------------------
     --clones a model in order to always save a clean copy
     function cleanModelInit(model, opt)
         cleanModel = model:clone():float()
         moduleSharing(cleanModel, opt) -- share parameters (same # of params as main model)
         cleanParameters = cleanModel:getParameters()
+        
+        --clean propagation data if the model has been already used (but still many other remain:()
+        for _,module in ipairs(cleanModel:listModules()) do
+            if module.output then module.output = module.output.new() end
+            if module.gradInput then module.gradInput = module.gradInput.new() end
+        end
+    end
+    
+    -- Copies also tensors which are not 'parameters' but were present from the init. Specifically targetting (Spatial)BatchNormalization.
+    local function updateCleanTensors(mod, cleanmod)
+        if cleanmod.modules then
+            for i=1,#cleanmod.modules do
+                updateCleanTensors(mod.modules[i], cleanmod.modules[i])
+            end
+        end
+        
+        for name,field in pairs(cleanmod) do
+            if torch.isTensor(field) and field:nElement()>0 and mod[name] and torch.isTensor(mod[name])
+               and name~='gradInput' and name~='output' and name~='weight' and name~='bias' and name~='gradWeight' and name~='gradBias' then
+                    field:copy(mod[name])
+            end
+        end        
     end
 
     ----------------------------------------------------------------------
@@ -237,12 +255,19 @@ do
             os.execute('mv ' .. filename .. ' ' .. filename .. '.old')
         end
         print('<trainer> saving network to '..filename)
+        
         cleanParameters:copy(parameters)
         cleanModel.epoch = model.epoch
+        updateCleanTensors(model, cleanModel)
+
         torch.save(filename, cleanModel)
         torch.save(filename..'.optconfig', config)
         --torch.save(filename..cleanModel.epoch, cleanModel)
         --torch.save(filename..cleanModel.epoch..'.optconfig', config)   
+        
+        if paths.filep(filename .. '.old') then
+            os.execute('rm ' .. filename .. '.old')
+        end
     end
 end
 
