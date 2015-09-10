@@ -102,7 +102,9 @@ end
 -- Prints a Lua table
 function printTable(input)
     local function recursivePrint(input)
-        if torch.type(input) == 'table' then
+        if type(input) == 'table' and input.__tostring__ then
+            return input:__tostring__()
+        elseif torch.type(input) == 'table' then
             local str = '{'
             for k,v in pairs(input) do 
                 str = str..k..'='..recursivePrint(v)..', '
@@ -110,7 +112,7 @@ function printTable(input)
             return string.sub(str, 1, #str-2)..'}'
         elseif torch.type(input) == 'boolean' then
             return input and 'true' or 'false'
-        else    
+        else
             return input
         end
     end
@@ -244,6 +246,24 @@ function plotSpatialConvolutionMM(convmm, win, legend)
     print('L1 norm of weights: ' .. legend .. ' :' .. torch.sum(torch.abs(weights)))
      
     return image.display{image=weightLayers, zoom=6, min=-1, max=1, win=win, legend=legend, padding=1, nrow=1} --nrow=10
+end    
+
+----------------------------------------------------------------------
+-- Runs useless computation for about a minute, heating the gpu. This is useful for reliable clocking, because I observe
+-- that a cold gpu can run faster but after some time it reaches a temperature where some thermal throttling gets active
+-- and suddenly everything gets slower. So it's better to clock code at this 'fixed' state.
+function warmUpGpu(niter)
+    niter = niter or 1500
+    --local timer = torch.Timer()
+    local M = nn.SpatialConvolutionMM(128,256,3,3):cuda()
+    local input = torch.CudaTensor(128,128,30,30)
+    print('Warming up before measurements')
+    for i = 0,niter do
+        --timer:reset()
+        M(input)
+        --cutorch.synchronize(); print(i, timer:time().real)
+        if i%100==0 then xlua.progress(i, niter) end    
+    end
 end    
 
 ----------------------------------------------------------------------
