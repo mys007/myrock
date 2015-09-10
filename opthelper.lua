@@ -21,7 +21,7 @@ function prepareModel(model, opt)
     
     -- Set individual factors
     for i,module in ipairs(model:listModules()) do
-        if (opt.caffeBiases and module.weight ~= nil) then
+        if (opt.caffeBiases and module.weight ~= nil and module.bias ~= nil) then
             if module.lrFactorB == nil then module.lrFactorB = 2*(module.lrFactorW or 1) end
             if module.decayFactorB == nil then module.decayFactorB = 0 end
         end
@@ -54,7 +54,7 @@ function prepareGradPerModule(model, opt)
             --NOTE: this is different than in optim.sgd, they ignore shared weights
             if opt.weightDecay > 0 then
                 if (module.decayFactorW ~= 0) then module.gradWeight:add(opt.weightDecay*(module.decayFactorW or 1), module.weight) end
-                if (module.decayFactorB ~= 0) then module.gradBias:add(opt.weightDecay*(module.decayFactorB or 1), module.bias) end
+                if (module.decayFactorB ~= 0 and module.gradBias) then module.gradBias:add(opt.weightDecay*(module.decayFactorB or 1), module.bias) end
                 --TODO: should also adjust err: err = crit + 0.5*x:norm^2.  But I don't need it, so no need to waste gpu time
             end
         end   

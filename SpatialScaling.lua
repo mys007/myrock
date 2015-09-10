@@ -1,4 +1,5 @@
 require 'nn'
+require 'myrock'
 require 'DebugModule'
 require 'strict'
 
@@ -70,12 +71,19 @@ end
 
 function SpatialScaling:updateOutput(input)
     assert(input ~= nil)
-
+    
     if self.getSizeFunc then 
         self.outW, self.outH = self.getSizeFunc()
+    end    
+    
+    -- batchmode to 3D (because of bmm)
+    local bs = input:dim()==4 and input:size(1) or 0
+    if bs>0 then
+        input = input:view(-1,input:size(3), input:size(4))
+        if self.output:dim()==4 then self.output  = self.output:view(-1, self.outH, self.outW) end
     end
  
-    if input:dim() ~= self.output:dim() or self.output:size(2)~=self.outH or self.output:size(3)~=self.outW or 
+    if input:dim() ~= self.output:dim() or self.output:size(1)~=input:size(1) or self.output:size(2)~=self.outH or self.output:size(3)~=self.outW or 
        self.WC==nil or input:size(2)~=self.WC:size(3) or input:size(3)~=self.WR:size(2) then
         
         self:createWeights(input:size(3), input:size(2), self.outW, self.outH)
@@ -89,11 +97,29 @@ function SpatialScaling:updateOutput(input)
     
     self.tmpFW:bmm(self.WC, input)
     self.output:bmm(self.tmpFW, self.WR)
+    
+    if bs>0 then
+        self.output = self.output:view(bs, -1, self.outH, self.outW)
+    end
+    
     return self.output
 end
 
 function SpatialScaling:updateGradInput(input, gradOutput)
     assert(input ~= nil and gradOutput ~= nil)
+    
+    -- batchmode to 3D (because of bmm)
+    local bs = input:dim()==4 and input:size(1) or 0
+    if bs>0 then
+        input = input:view(-1,input:size(3), input:size(4))
+        if not gradOutput:isContiguous() then --e.g. from concat
+            self._gradOutput = self._gradOutput or gradOutput.new()
+            self._gradOutput:resizeAs(gradOutput):copy(gradOutput)
+            gradOutput = self._gradOutput
+        end        
+        gradOutput = gradOutput:view(-1,gradOutput:size(3), gradOutput:size(4))
+        if self.gradInput:dim()==4 then self.gradInput = self.gradInput:view(-1, self.gradInput:size(3), self.gradInput:size(4)) end
+    end
     
     if not input:isSameSizeAs(self.gradInput) then
         self.gradInput:resizeAs(input)
@@ -102,6 +128,11 @@ function SpatialScaling:updateGradInput(input, gradOutput)
     
     self.tmpBW:bmm(self.WC:transpose(2,3), gradOutput)
     self.gradInput:bmm(self.tmpBW, self.WR:transpose(2,3))
+    
+    if bs>0 then
+        self.gradInput = self.gradInput:view(bs, -1, self.gradInput:size(2), self.gradInput:size(3))
+    end
+    
     return self.gradInput
 end
 
@@ -183,6 +214,21 @@ function OFFmytest.testUpscaleFloat()
     local dMy = supMy:backward(inp, err)
 
     tester:assertlt(torch.norm(err,1) - torch.norm(dMy,1), 1e-5)
+end
+
+function OFFmytest.testBatch()
+    local inp = torch.rand(2,5,4,4)
+    local err = torch.rand(2,5,5,5)
+  
+    local supMy = nn.SpatialScaling(function () return 5,5 end)
+  
+    local oMy = supMy:forward(inp):clone()
+    local dMy = supMy:backward(inp, err):clone()
+
+    for i=1,2 do
+        tester:assertTensorEq(oMy[i], supMy:forward(inp[i]), 1e-5)
+        tester:assertTensorEq(dMy[i], supMy:backward(inp[i], err[i]), 1e-5)
+    end
 end
 
     
