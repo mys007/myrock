@@ -185,9 +185,11 @@ function boxIntersectionUnion(idx1, idx2)
     assert(#idx1==#idx2)
     local inter, area1, area2 = 1, 1, 1
     for i=1,#idx1 do
-        inter = inter * math.max(0, math.min(idx1[i][2],idx2[i][2])+1 - math.max(idx1[i][1],idx2[i][1]))
-        area1 = area1 * (idx1[i][2]+1 - idx1[i][1])
-        area2 = area2 * (idx2[i][2]+1 - idx2[i][1])
+        if #idx1[i]>0 then
+            inter = inter * math.max(0, math.min(idx1[i][2],idx2[i][2])+1 - math.max(idx1[i][1],idx2[i][1]))
+            area1 = area1 * (idx1[i][2]+1 - idx1[i][1])
+            area2 = area2 * (idx2[i][2]+1 - idx2[i][1])
+        end
     end
     local union = area1 + area2 - inter
     return inter, union
@@ -199,7 +201,9 @@ function boxCenterDistance(idx1, idx2)
     assert(#idx1==#idx2)
     local dist = 0
     for i=1,#idx1 do
-        dist = dist + ((idx1[i][2] + idx1[i][1])/2 - (idx2[i][2] + idx2[i][1])/2)^2
+        if #idx1[i]>0 then
+            dist = dist + ((idx1[i][2] + idx1[i][1])/2 - (idx2[i][2] + idx2[i][1])/2)^2
+        end
     end
     return math.sqrt(dist)
 end 
@@ -209,10 +213,14 @@ end
 function boxPad(indices, pad, degenPad)
     local out = {}
     for i=1,#indices do
-        if indices[i][1]==indices[i][2] then 
-            out[i] = {indices[i][1] - degenPad, indices[i][2] + degenPad}
+        if #indices[i]>0 then
+            if indices[i][1]==indices[i][2] then 
+                out[i] = {indices[i][1] - degenPad, indices[i][2] + degenPad}
+            else
+                out[i] = {indices[i][1] - pad, indices[i][2] + pad}
+            end
         else
-            out[i] = {indices[i][1] - pad, indices[i][2] + pad}
+            out[i] = indices[i]
         end
     end
     return out

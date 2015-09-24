@@ -241,7 +241,7 @@ do
         for name,field in pairs(cleanmod) do
             if torch.isTensor(field) and field:nElement()>0 and mod[name] and torch.isTensor(mod[name])
                and name~='gradInput' and name~='output' and name~='weight' and name~='bias' and name~='gradWeight' and name~='gradBias' then
-                    field:resizeAs(mod[name])
+                    field:resize(mod[name]:size())
                     field:copy(mod[name])
             end
         end        
