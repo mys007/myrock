@@ -52,7 +52,7 @@ function prepareGradPerModule(model, opt)
             end          
 
             --NOTE: this is different than in optim.sgd, they ignore shared weights
-            if opt.weightDecay > 0 then
+            if opt.weightDecay > 0 and (not opt.weightDecayMaxEpoch or model.epoch <= opt.weightDecayMaxEpoch) then
                 if (module.decayFactorW ~= 0) then module.gradWeight:add(opt.weightDecay*(module.decayFactorW or 1), module.weight) end
                 if (module.decayFactorB ~= 0 and module.gradBias) then module.gradBias:add(opt.weightDecay*(module.decayFactorB or 1), module.bias) end
                 --TODO: should also adjust err: err = crit + 0.5*x:norm^2.  But I don't need it, so no need to waste gpu time
@@ -159,6 +159,20 @@ local function optimSgd(opfunc, x, config, state)
    return x,{fx},{-clr, dfdx}
 end
 
+
+local function decodeCustomSched(str, epoch)
+    for token in string.gmatch(str, "[^_]+") do
+        if token~='sched' then
+            local args = {} --last_epochxlr  (in increasing epoch order)
+            for a in string.gmatch(string.trim(token), "[^x]+") do
+                table.insert(args, tonumber(a))
+            end
+            if epoch <= args[1] then return args[2] end
+        end
+    end
+    assert(false, 'undefined schedule string for epoch '..epoch)
+end
+  
 ----------------------------------------------------------------------
 -- optimize on current mini-batch
 function doOptStep(model, parameters, feval, opt, config)
@@ -190,6 +204,10 @@ function doOptStep(model, parameters, feval, opt, config)
             config.learningRate = opt.learningRate * math.pow(opt.lrdGamma, (model.epoch-1) / opt.lrdStep)
         elseif (opt.lrdPolicy == 'poly') then --as in caffe (polynomial decay, fixed number of max iterations, doesn't have such a sharp decay at the start as the others)
             config.learningRate = opt.learningRate * math.max(0, math.pow(1 - config.evalCounter / opt.lrdStep, opt.lrdGamma))
+        elseif string.starts(opt.lrdPolicy,'sched') then --predefined learning schedule in format sched_20x1e-2_35x1e-3  
+            local prevlr = config.learningRate
+            config.learningRate = decodeCustomSched(opt.lrdPolicy, model.epoch)
+            if opt.optimization == 'SGD' and prevlr ~= config.learningRate then config.dfdx = nil end --zero momentum vector on lr step (FB does it in their imagenet code)
         else
             assert(false, 'unknown lrdPolicy')    
         end
