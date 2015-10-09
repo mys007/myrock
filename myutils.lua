@@ -334,6 +334,21 @@ function gaussConstInit(module, wstddev, bval)
 end
 
 ----------------------------------------------------------------------
+-- Clean temporary data if the model has been already used in order to reduce size (but still many other remain:()
+function sanitizeModel(model)
+    for _,module in ipairs(model:listModules()) do
+        if module.output then module.output = module.output.new() end
+        if module.gradInput then module.gradInput = module.gradInput.new() end
+        if torch.type(module) == 'nn.BatchNormalization' or torch.type(module) == 'nn.SpatialBatchNormalization' then
+            module.buffer = nil; module.buffer2 = nil; module.centered = nil; module.std = nil; module.normalized = nil;
+        end
+    end
+end     
+
+
+
+
+----------------------------------------------------------------------
 --Leaky ReLu (as in "Rectifier Nonlinearities Improve Neural Network Acoustic Models")
 -- observation?: even if the weights of input modules are set to produce only negative input to the nonlinearity
 -- due to large step size, there is still a hope for improvement (classical ReLu will never update the predecessors any more)

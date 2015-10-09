@@ -38,6 +38,7 @@ function SpatialScaling:createWeights(inW, inH, outW, outH)
         self.WC = self:createBlerpWeights(outH, inH)
     else    
         self.WC = self:createBlerpWeights(inH, outH):transpose(2,3)
+        self.WC:cdiv( self.WC:sum(3):expandAs(self.WC) ) --renormalize line sums to 1, fw pass should transform constant image to the same image
     end        
     
     if (outW==outH and inW==inH) then
@@ -46,6 +47,7 @@ function SpatialScaling:createWeights(inW, inH, outW, outH)
         self.WR = self:createBlerpWeights(outW, inW):transpose(2,3)
     else    
         self.WR = self:createBlerpWeights(inW, outW)
+        self.WR:cdiv( self.WR:sum(2):expandAs(self.WR) )
     end    
 
 end
@@ -243,6 +245,14 @@ function OFFmytest.testScaleInteractive()
     model:training()           
     local res = model:forward(img)
     model:backward(img, res*1.2)    
+end
+
+function mytest.testConstancy()
+    local img = torch.Tensor(1,20,20):fill(2)
+    local M1 = nn.SpatialScaling(40,40)
+    local M2 = nn.SpatialScaling(10,10)
+    tester:assertTensorEq(torch.Tensor(1,40,40):fill(2), M1:forward(img), 1e-5)
+    tester:assertTensorEq(torch.Tensor(1,10,10):fill(2), M2:forward(img), 1e-5)
 end
 
 function OFFmytest.testJitteringModuleScale()

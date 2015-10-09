@@ -240,12 +240,7 @@ do
         cleanModel = model:clone():float()
         moduleSharing(cleanModel, opt) -- share parameters (same # of params as main model)
         cleanParameters = cleanModel:getParameters()
-        
-        --clean propagation data if the model has been already used (but still many other remain:()
-        for _,module in ipairs(cleanModel:listModules()) do
-            if module.output then module.output = module.output.new() end
-            if module.gradInput then module.gradInput = module.gradInput.new() end
-        end
+        sanitizeModel(cleanModel)
     end
     
     -- Copies also tensors which are not 'parameters' but were present from the init. Specifically targetting (Spatial)BatchNormalization.
