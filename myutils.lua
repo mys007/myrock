@@ -337,8 +337,8 @@ end
 -- Clean temporary data if the model has been already used in order to reduce size (but still many other remain:()
 function sanitizeModel(model)
     for _,module in ipairs(model:listModules()) do
-        if module.output then module.output = module.output.new() end
-        if module.gradInput then module.gradInput = module.gradInput.new() end
+        if module.output then module.output = (torch.type(module.output) == 'table') and {} or module.output.new() end
+        if module.gradInput then module.gradInput = (torch.type(module.gradInput) == 'table') and {} or module.gradInput.new() end
         if torch.type(module) == 'nn.BatchNormalization' or torch.type(module) == 'nn.SpatialBatchNormalization' then
             module.buffer = nil; module.buffer2 = nil; module.centered = nil; module.std = nil; module.normalized = nil;
         end
