@@ -1,17 +1,19 @@
 
 --- LEGACY. From end of June15 implemented in standard nn.SpatialMaxPooling
 
-local ffi = require 'ffi'
-require 'cunn'
+myrock.SpatialMaxPoolingCaffe = nn.SpatialMaxPooling
 
-ffi.cdef[[
-void SpatialMaxPoolingCaffe_updateOutput(THCState* state, THCudaTensor* input, 
-    THCudaTensor* output, THCudaTensor* indices, int kW, int kH, int dW, int dH, bool train);
-void SpatialMaxPoolingCaffe_updateGradInput(THCState* state, THCudaTensor* input,
-    THCudaTensor* gradInput, THCudaTensor* gradOutput, THCudaTensor* indices, int kW, int kH, int dW, int dH);
-]]
+--local ffi = require 'ffi'
+--require 'cunn'
 
-local C = ffi.load(package.searchpath('libmyrock', package.cpath))
+--ffi.cdef[[
+--void SpatialMaxPoolingCaffe_updateOutput(THCState* state, THCudaTensor* input, 
+--    THCudaTensor* output, THCudaTensor* indices, int kW, int kH, int dW, int dH, bool train);
+--void SpatialMaxPoolingCaffe_updateGradInput(THCState* state, THCudaTensor* input,
+--    THCudaTensor* gradInput, THCudaTensor* gradOutput, THCudaTensor* indices, int kW, int kH, int dW, int dH);
+--]]
+
+--[[local C = ffi.load(package.searchpath('libmyrock', package.cpath))
 
 -- MaxPooling from Caffe: deterministic behavior for overlapping kernels and ceil()-output size  
 local SpatialMaxPoolingCaffe, parent = torch.class('myrock.SpatialMaxPoolingCaffe', 'nn.SpatialMaxPooling')
@@ -74,7 +76,7 @@ end
 function SpatialMaxPoolingCaffe:ceil(doCeil)
    assert(doCeil, 'floor not implemented yet')
    return self
-end
+end--]]
 
 --------------------------------------- TEST ---------------------------------------
 --[[
