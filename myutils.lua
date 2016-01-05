@@ -100,7 +100,7 @@ end
 
 ----------------------------------------------------------------------
 -- Prints a Lua table
-function printTable(input)
+function printTable(...)
     local function recursivePrint(input)
         if type(input) == 'table' and input.__tostring__ then
             return input:__tostring__()
@@ -116,7 +116,10 @@ function printTable(input)
             return input
         end
     end
-    print(recursivePrint(input))
+    local parm={...}
+    for i=1,#parm do
+        print(recursivePrint(parm[i]))
+    end
 end
 
 ----------------------------------------------------------------------
