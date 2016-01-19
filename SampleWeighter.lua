@@ -15,11 +15,14 @@ function SampleWeighter:updateOutput(input)
 end
 
 function SampleWeighter:updateGradInput(input, gradOutput)
-    local factors = gradOutput:dim()==2 and self.factors:view(-1,1) or self.factors
-    local L1orig = gradOutput:norm(1)
-    gradOutput:cmul(factors:expandAs(gradOutput))
-    local L1new = gradOutput:norm(1)
-    gradOutput:mul(L1orig/L1new) --keep the L1-norm of gradient ("it's energy") for consistency
+    if self.train then
+        local factors = gradOutput:dim()==2 and self.factors:view(-1,1) or self.factors
+        local L1orig = gradOutput:norm(1) + 1e-6
+        gradOutput:cmul(factors:expandAs(gradOutput))
+        local L1new = gradOutput:norm(1) + 1e-6
+        gradOutput:mul(L1orig/L1new) --keep the L1-norm of gradient ("its energy") for consistency
+        self.gradInput = gradOutput
+    end
     self.gradInput = gradOutput
     return self.gradInput
 end
