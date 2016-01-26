@@ -386,10 +386,10 @@ function LReLU:updateGradInput(input, gradOutput)
     return self.gradInput
 end
 
-function LReLU:type(type)
-   LReLU_parent.type(self,type)
-   self.reluP:type(type)
-   self.reluN:type(type)
+function LReLU:type(type, tensorCache)
+   LReLU_parent.type(self,type, tensorCache)
+   self.reluP:type(type, tensorCache)
+   self.reluN:type(type, tensorCache)
    return self
 end
 

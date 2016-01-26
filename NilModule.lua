@@ -37,7 +37,7 @@ function NilModule:updateGradInput(input, gradOutput)
     return self.gradInput
 end
 
-function NilModule:type(type)
-   parent.type(self, type)
+function NilModule:type(type, tensorCache)
+   parent.type(self, type, tensorCache)
    self.gradInput = nil
 end

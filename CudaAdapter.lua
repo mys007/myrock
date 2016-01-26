@@ -54,9 +54,9 @@ function CudaAdapter:convert(out, x)
     end 
 end
 
-function CudaAdapter:type(type)
-    self.output = torch.Tensor():type(type)
-    self.gradInput = torch.Tensor():type(type)
+function CudaAdapter:type(type, tensorCache)
+    self.output = torch.Tensor():type(type, tensorCache)
+    self.gradInput = torch.Tensor():type(type, tensorCache)
     return self --the internal module has been spared of type conversion
 end
 

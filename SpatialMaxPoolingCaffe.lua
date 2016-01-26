@@ -65,12 +65,12 @@ function SpatialMaxPoolingCaffe:updateGradInput(input, gradOutput)
     return self.gradInput
 end
 
-function SpatialMaxPoolingCaffe:type(type)
+function SpatialMaxPoolingCaffe:type(type, tensorCache)
    self.indices = torch.Tensor()
    self.gradInput = torch.Tensor()
    self.output = torch.Tensor()
    self.padder = nil
-   return parent.type(self,type)
+   return parent.type(self,type, tensorCache)
 end
 
 function SpatialMaxPoolingCaffe:ceil(doCeil)

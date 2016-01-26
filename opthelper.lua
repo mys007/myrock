@@ -137,8 +137,8 @@ local function optimSgd(opfunc, x, config, state)
     else
        -- ** Torch original
        if mom ~= 0 then
-          if not state.dfdx then
-             state.dfdx = torch.Tensor():typeAs(dfdx):resizeAs(dfdx):copy(dfdx)
+          if not state.dfdx or state.dfdx:dim()==0 then
+             state.dfdx = (state.dfdx or torch.Tensor()):typeAs(dfdx):resizeAs(dfdx):copy(dfdx)
           else
              state.dfdx:mul(mom):add(1-damp, dfdx)
           end
@@ -207,7 +207,7 @@ function doOptStep(model, parameters, feval, opt, config)
         elseif string.starts(opt.lrdPolicy,'sched') then --predefined learning schedule in format sched_20x1e-2_35x1e-3  
             local prevlr = config.learningRate
             config.learningRate = decodeCustomSched(opt.lrdPolicy, model.epoch)
-            if opt.optimization == 'SGD' and prevlr ~= config.learningRate then config.dfdx = nil end --zero momentum vector on lr step (FB does it in their imagenet code)
+            if opt.optimization == 'SGD' and prevlr ~= config.learningRate then config.dfdx = config.dfdx and config.dfdx:resize(0) or nil end --zero momentum vector on lr step (FB does it in their imagenet code)
         else
             assert(false, 'unknown lrdPolicy')    
         end
