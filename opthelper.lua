@@ -232,34 +232,12 @@ end
 
 
 do
-    local cleanModel, cleanParameters = nil, nil
-    
     ----------------------------------------------------------------------
     --clones a model in order to always save a clean copy
     function cleanModelInit(model, opt)
-        cleanModel = model:clone():float()
-        moduleSharing(cleanModel, opt) -- share parameters (same # of params as main model)
-        cleanParameters = cleanModel:getParameters()
-        sanitizeModel(cleanModel)
+    	--legacy
     end
     
-    -- Copies also tensors which are not 'parameters' but were present from the init. Specifically targetting (Spatial)BatchNormalization.
-    local function updateCleanTensors(mod, cleanmod)
-        if cleanmod.modules then
-            for i=1,#cleanmod.modules do
-                updateCleanTensors(mod.modules[i], cleanmod.modules[i])
-            end
-        end
-        
-        for name,field in pairs(cleanmod) do
-            if torch.isTensor(field) and field:nElement()>0 and mod[name] and torch.isTensor(mod[name])
-               and name~='gradInput' and name~='output' and name~='weight' and name~='bias' and name~='gradWeight' and name~='gradBias' then
-                    field:resize(mod[name]:size())
-                    field:copy(mod[name])
-            end
-        end        
-    end
-
     ----------------------------------------------------------------------
     -- save/log current net (a clean model without any gradients, inputs,... ; it takes less storage)
     function cleanModelSave(model, parameters, config, opt, fname)  
@@ -269,15 +247,12 @@ do
             os.execute('mv ' .. filename .. ' ' .. filename .. '.old')
         end
         print('<trainer> saving network to '..filename)
-        
-        cleanParameters:copy(parameters)
-        cleanModel.epoch = model.epoch
-        updateCleanTensors(model, cleanModel)
 
-        torch.save(filename, cleanModel)
+		model:clearState()
+        torch.save(filename, model)
         torch.save(filename..'.optconfig', config)
-        --torch.save(filename..cleanModel.epoch, cleanModel)
-        --torch.save(filename..cleanModel.epoch..'.optconfig', config)   
+        --torch.save(filename..model.epoch, model)
+        --torch.save(filename..model.epoch..'.optconfig', config)   
         
         if paths.filep(filename .. '.old') then
             os.execute('rm ' .. filename .. '.old')

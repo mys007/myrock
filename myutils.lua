@@ -337,7 +337,7 @@ function gaussConstInit(module, wstddev, bval)
 end
 
 ----------------------------------------------------------------------
--- Clean temporary data if the model has been already used in order to reduce size (but still many other remain:()
+-- Legacy: Clean temporary data if the model has been already used in order to reduce size (but still many other remain:() --UPD: use clearState()
 function sanitizeModel(model)
     for _,module in ipairs(model:listModules()) do
         if module.output then module.output = (torch.type(module.output) == 'table') and {} or module.output.new() end
