@@ -151,9 +151,24 @@ local function optimSgd(opfunc, x, config, state)
 
        x:add(-clr, dfdx)
     end   
-     
+    
    -- update evaluation counter
    state.evalCounter = state.evalCounter + 1
+   
+    -- optional ASGD (stolen from asgd.lua): a := a + mu_t [ x - a ]     [YET UNTESTED]
+    if state.ASGDt0 and state.ASGDt0 > 0 then
+       state.mu_t = state.mu_t or 1
+       state.ax = state.ax or torch.Tensor():typeAs(x):resizeAs(x):zero()
+       state.tmp = state.tmp or torch.Tensor():typeAs(state.ax):resizeAs(state.ax)
+       if state.mu_t ~= 1 then
+          state.tmp:copy(x)
+          state.tmp:add(-1,state.ax):mul(state.mu_t)
+          state.ax:add(state.tmp)
+       else
+          state.ax:copy(x)
+       end
+       state.mu_t = 1 / math.max(1, state.evalCounter - state.ASGDt0)
+   end     
 
    -- return x*, f(x) before optimization, delta
    return x,{fx},{-clr, dfdx}
@@ -176,12 +191,35 @@ end
 ----------------------------------------------------------------------
 -- optimize on current mini-batch
 function doOptStep(model, parameters, feval, opt, config)
+
+    config.evalCounter = config.evalCounter or 0 
+        
+    if (opt.lrdPolicy == 'fixed') then
+        config.learningRate = opt.learningRate
+    elseif (opt.lrdPolicy == 'inv') then --torch's default ; caffe also supports denominator^power
+        config.learningRate = opt.learningRate / (1 + config.evalCounter * opt.lrdGamma)
+    elseif (opt.lrdPolicy == 'step') then --as in caffe (drop the learning rate stepwise by a factor of lrdGamma every lrdStep iterations)
+        config.learningRate = opt.learningRate * math.pow(opt.lrdGamma, math.floor(config.evalCounter / opt.lrdStep))
+    elseif (opt.lrdPolicy == 'estep') then --as above but epoch-based not iter-based
+        config.learningRate = opt.learningRate * math.pow(opt.lrdGamma, math.floor((model.epoch-1) / opt.lrdStep))            
+    elseif (opt.lrdPolicy == 'expep') then --mine version of exponential decay ("half lr each 10 epochs"), epoch-based not iter-based
+        config.learningRate = opt.learningRate * math.pow(opt.lrdGamma, (model.epoch-1) / opt.lrdStep)
+    elseif (opt.lrdPolicy == 'poly') then --as in caffe (polynomial decay, fixed number of max iterations, doesn't have such a sharp decay at the start as the others)
+        config.learningRate = opt.learningRate * math.max(0, math.pow(1 - config.evalCounter / opt.lrdStep, opt.lrdGamma))
+    elseif string.starts(opt.lrdPolicy,'sched') then --predefined learning schedule in format sched_20x1e-2_35x1e-3  
+        local prevlr = config.learningRate
+        config.learningRate = decodeCustomSched(opt.lrdPolicy, model.epoch)
+        if opt.optimization == 'SGD' and prevlr ~= config.learningRate then config.dfdx = config.dfdx and config.dfdx:resize(0) or nil end --zero momentum vector on lr step (FB does it in their imagenet code)
+    else
+        assert(false, 'unknown lrdPolicy')    
+    end
+
+
     if opt.optimization == 'CG' then
         config.maxIter = opt.maxIter
         optim.cg(feval, parameters, config)
 
     elseif opt.optimization == 'LBFGS' then
-        config.learningRate = opt.learningRate
         config.maxIter = opt.maxIter
         config.nCorrection = 10
         optim.lbfgs(feval, parameters, config)
@@ -194,36 +232,27 @@ function doOptStep(model, parameters, feval, opt, config)
         config.evalCounter = config.evalCounter or 0
         config.caffeFormula = (opt.optimization == 'SGDCaffe')
 
-        if (opt.lrdPolicy == 'fixed') then
-            config.learningRate = opt.learningRate
-        elseif (opt.lrdPolicy == 'inv') then --torch's default ; caffe also supports denominator^power
-            config.learningRate = opt.learningRate / (1 + config.evalCounter * opt.lrdGamma)
-        elseif (opt.lrdPolicy == 'step') then --as in caffe (drop the learning rate stepwise by a factor of lrdGamma every lrdStep iterations)
-            config.learningRate = opt.learningRate * math.pow(opt.lrdGamma, math.floor(config.evalCounter / opt.lrdStep))
-        elseif (opt.lrdPolicy == 'expep') then --mine version of exponential decay ("half lr each 10 epochs"), epoch-based not iter-based
-            config.learningRate = opt.learningRate * math.pow(opt.lrdGamma, (model.epoch-1) / opt.lrdStep)
-        elseif (opt.lrdPolicy == 'poly') then --as in caffe (polynomial decay, fixed number of max iterations, doesn't have such a sharp decay at the start as the others)
-            config.learningRate = opt.learningRate * math.max(0, math.pow(1 - config.evalCounter / opt.lrdStep, opt.lrdGamma))
-        elseif string.starts(opt.lrdPolicy,'sched') then --predefined learning schedule in format sched_20x1e-2_35x1e-3  
-            local prevlr = config.learningRate
-            config.learningRate = decodeCustomSched(opt.lrdPolicy, model.epoch)
-            if opt.optimization == 'SGD' and prevlr ~= config.learningRate then config.dfdx = config.dfdx and config.dfdx:resize(0) or nil end --zero momentum vector on lr step (FB does it in their imagenet code)
-        else
-            assert(false, 'unknown lrdPolicy')    
-        end
-
         local _,loss,step = optimSgd(feval, parameters, config) 
-            
         return loss[1], step      
 
     elseif opt.optimization == 'ASGD' then
-        config.eta0 = opt.learningRate --(not exactly the same formula as in sgd)
-        config.learningRate = opt.learningRate
-        if model.epoch < opt.asgdE0 then config.t0 = 1e20 elseif config.t0 == 1e20 then config.t0 = config.t end 
-        config.lambda = 0 --weightDecay handled in prepareGradPerModule
-        local _,loss,avgx = optim.asgd(feval, parameters, config)
+        config.t0 = config.t0 or 1e20
+        if model.epoch >= opt.asgdE0 and config.t0 == 1e20 then config.t0 = config.t end 
+   
+        config.lambda = 0      
+        --ADGD default (variant of 'inv'), lrdGamma = 1e-8 [very slow decay, in first 1e6 iters unnoticable]
+        --config.eta_t = opt.learningRate / math.pow(1 + config.evalCounter * opt.lrdGamma, 0.75)  
+        config.eta_t = opt.learningRate
         
+        --note: momentum not supported; weightDecay handled in prepareGradPerModule
+        local _,loss,avgx = optim.asgd_no_weight_decay(feval, parameters, config)
         return loss[1], {1,avgx}--todo 
+        
+    elseif opt.optimization == 'Adam' then
+        config.learningRate = config.learningRate or opt.learningRate
+        local _,loss = optim.adam(feval, parameters, config)
+        config.evalCounter = config.t
+        return loss[1], {1,torch.Tensor{0,0}}--todo 
 
     else
         error('unknown optimization method')
