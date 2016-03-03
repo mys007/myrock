@@ -48,6 +48,26 @@ function string.split(str, delim, maxNb)
 end
 
 ----------------------------------------------------------------------
+-- Computes the receptive field size for an output neuron
+function getOutputNeuronReceptiveField(module, val)
+    val = val or 1
+    if torch.typename(module)== 'nn.Parallel' then
+        local a = getOutputNeuronReceptiveField(module.modules[1], val)
+        local b = getOutputNeuronReceptiveField(module.modules[2], val)
+        assert(a==b)
+        return a
+    elseif torch.typename(module)== 'nn.Sequential' then  
+        for i=#module.modules,1,-1 do 
+            val = getOutputNeuronReceptiveField(module.modules[i], val)
+        end
+    elseif module.kW and module.dW then
+        assert(module.padW == module.padH and module.dW == module.dH and module.kW == module.kH)
+        val = (val-1)*module.dW + module.kW - 2*module.padW
+    end
+    return val
+end
+
+----------------------------------------------------------------------
 --Creates isotropic 2D gaussian. Unlike image.gaussian this is consistent with matlab's fspecial
 function gaussianfilter2D(size, sigma)
     assert((size+1) % 2 == 0 and sigma~=nil)
@@ -278,7 +298,7 @@ function resetHe2015(model, opt)
             if torch.typename(module) == 'nn.SpatialConvolutionMM' or torch.typename(module) == 'nn.SpatialConvolutionLRScale' then    
                 n = module.kW*module.kH*module.nInputPlane
                 --if (opt and opt.modelName == 'pyra') then n = n*opt.pyraFanIn end --(multiple conv results are summed up if createPyramidConvolutionPostscale used)
-            elseif torch.typename(module) == 'nn.VolumetricConvolution' then
+            elseif torch.typename(module):find'.VolumetricConvolution' then
                 n = module.kT*module.kW*module.kH*module.nInputPlane             
             elseif torch.typename(module) == 'nn.Linear' then    
                 n = module.weight:size(2)
