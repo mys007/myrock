@@ -30,3 +30,28 @@ end
 function SampleWeighter:setFactors(factors)
     self.factors:resize(factors:size()):copy(factors)
 end
+
+
+-----TEST
+--[[
+local mytest = {}
+local OFFmytest = {}
+local tester = torch.Tester()
+
+function mytest.test1()
+
+   local input = torch.Tensor{1,2,3,0,4,0}
+   local output = torch.Tensor{10,20,30,0,40,0}
+
+   local module = myrock.SampleWeighter()
+   module:training()
+   module:setFactors(torch.Tensor{0,0.1,0.1,0,1,0})
+
+   module:forward(input)
+   module:backward(input, output)
+
+   print(module.gradInput)
+end
+   
+tester:add(mytest) 
+tester:run()   --]]
